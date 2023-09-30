@@ -5,14 +5,14 @@ let num1;
 let operand;
 let num2;
 
-let buffer = "0";
-let initial = true;
-let done = false;
-let numbers = /[0-9]+/i;
-let operands = /\+|-|x|\//i;
+let history = [];
+
+let numbers = /[0-9]+|π/i;
+let operands = /\+|-|x|\.|%|\//i;
 let screenContents = document.createElement('div');
 screenContents.style.fontSize = "8vh";
-screenContents.textContent = buffer;
+screenContents.textContent = GetDisplayText();
+
 
 screen.appendChild(screenContents ?? "0");
 
@@ -26,79 +26,51 @@ buttons.forEach((button) => {
     });
 
     button.addEventListener('click', () => {
-        if (button.textContent == "AC"){
-            Reset();
-            return;
-        }
-        if (numbers.test(button.textContent)){
-            if (+buffer > 100000)
+        switch (button.textContent){
+            case "AC":
+                Reset();
+                screenContents.textContent = GetDisplayText();
                 return;
-
-            if (initial == true){
-                buffer = button.textContent;
-                initial = false;
-            }
-            else
-                buffer += button.textContent;
-                
-            UpdateScreen();
+            case "=":
+                Evaluate();
+                screenContents.textContent = GetDisplayText();
+                return;
+            case "<-":
+                Undo();
+                screenContents.textContent = GetDisplayText();
+                return;
         }
-        else if (operands.test(button.textContent)){
 
-            if (num1 == null){
-                num1 = +buffer;
-                initial = true;
-                buffer = "0";
-                operand = button.textContent;
-                UpdateScreen()
+        if (operands.test(button.textContent)){
+            if (history.length == 0){
                 return;
             }
 
-            if (operands.test(screenContents.textContent.charAt(screenContents.textContent.length-1))){
-                operand = button.textContent;
-                UpdateScreen();
+            if (operands.test(history[history.length-1])){
+                history[history.length-1] = button.textContent;
+                screenContents.textContent = GetDisplayText();
                 return;
             }
+        }
 
-            num1 += +buffer;
-            initial = true;
-            buffer = "0";
-            operand = button.textContent;
-            UpdateScreen();
-        }
-        else if (button.textContent == "="){
-            num2 = +buffer;
-            buffer = "0";
-            try {
-                screenContents.textContent += ` = ${Operate(num1, operand, num2)}`;
-            }
-            catch (e){
-                console.log(e);
-                screenContents.textContent = e;
-            }
-            Reset(false);
-        }
+        history.push(button.textContent);
+        screenContents.textContent = GetDisplayText();
         
     })
 });
 
-function UpdateScreen() {
-    screenContents.textContent = `${num1 ?? ""} ${operand ?? ""} ${buffer ?? ""}`;
-}
-
 function Operate(num1, operand, num2) {
-    if (num1 == null || operand == null || num2 == null)
-        throw "ERR";
-
     switch (operand){
         case "+": 
-            return Add(num1, num2);
+            return Add(num1, num2).toString();
         case "-": 
-            return Subtract(num1, num2);
+            return Subtract(num1, num2).toString();
         case "x": 
-            return Multiply(num1, num2);
+            return Multiply(num1, num2).toString();
         case "/": 
-            return Divide(num1, num2);
+            return Divide(num1, num2).toString();
+        case "%":
+            return Modulo(num1, num2).toString();
     }
 }
 
@@ -124,13 +96,77 @@ function Divide(num1, num2){
 
 }
 
-function Reset(setToZero = true){
-    num1 = null;
-    num2 = null;
-    operand = null;
-    buffer = "0";
+function Modulo(num1, num2){
+    return num1 % num2;
+}
+
+function Reset(){
     initial = true;
-    done = false;
-    if (setToZero)
-        screenContents.textContent = buffer;
+    history = [];
+}
+
+function Undo(){
+
+    if (history.length == 1){
+        Reset();
+        return;
+    }
+
+    history.pop();
+
+}
+
+function Evaluate() {
+
+    let prevItem;
+
+    history.forEach((item) => {
+
+        if (prevItem == null){
+            num1 = item;
+            prevItem = item;
+            return;
+        }
+
+        if (numbers.test(item)){
+            if (operand == null){
+                num1 += item;
+                prevItem = item;
+                return;
+            }
+            
+            if (num2 == null){
+                num2 = item;
+                prevItem = item;
+                return;
+            }
+            else {
+                num2 += item;
+                prevItem = item;
+                return;
+            }
+        }
+
+        if (operands.test(item)){
+
+            if (num1 != null && operand != null && num2!= null){
+                num1 = Operate(+num1, operand, +num2);
+                operand = null;
+                num2 = null;
+            }
+
+            operand = item;
+            prevItem = item;
+            return;
+        }
+    });
+
+    history = [Operate(+num1, operand, +num2)];
+    num1 = null;
+    operand = null;
+    num2 = null;
+}
+
+function GetDisplayText(){  
+    return history.join(' ');
 }
