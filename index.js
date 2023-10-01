@@ -1,16 +1,54 @@
-const buttons = document.querySelectorAll('button');
-const screen = document.querySelector('.screen');
+
+const uiButton = document.querySelector('.switch-ui');
+
+modes = ["classic", "modern"];
+activeMode = 0;
+
+const all = document.querySelector('*');
+const body = document.querySelector(`.body-${modes[activeMode]}`);
+const screen = document.querySelector(`.screen-${modes[activeMode]}`);
+const buttonContainer = document.querySelector(`.buttons-container-${modes[activeMode]}`);
+const buttons = document.querySelectorAll(`.button-${modes[activeMode]}`);
+const operandButtons = document.querySelectorAll(`.operand-${modes[activeMode]}`);
+
+uiButton.addEventListener('click', () => {
+    RemoveMode(modes[activeMode]);
+    activeMode ^= 1;
+    AddMode(modes[activeMode]);
+});
+
+function AddMode(mode){
+    body.classList.add(`body-${mode}`);
+    screen.classList.add(`screen-${mode}`);
+    buttonContainer.classList.add(`buttons-container-${mode}`);
+    buttons.forEach((button) => button.classList.add(`button-${mode}`)); 
+    operandButtons.forEach((button) => button.classList.add(`operand-${mode}`)); 
+    
+}
+
+function RemoveMode(mode){
+    body.classList.remove(`body-${mode}`);
+    screen.classList.remove(`screen-${mode}`);
+    buttonContainer.classList.remove(`buttons-container-${mode}`);
+    buttons.forEach((button) => button.classList.remove(`button-${mode}`)); 
+    operandButtons.forEach((button) => button.classList.remove(`operand-${mode}`)); 
+}
 
 let num1;
 let operand;
 let num2;
 
+let processingFP = false;
+let dotClicked = false;
+let decimal = "";
+
 let history = [];
 
 let numbers = /[0-9]+|π/i;
-let operands = /\+|-|x|\.|%|\//i;
+let operands = /\+|-|x|%|\//i;
 let screenContents = document.createElement('div');
 screenContents.style.fontSize = "8vh";
+screenContents.style.paddingRight = "8px";
 screenContents.textContent = GetDisplayText();
 
 
@@ -18,11 +56,11 @@ screen.appendChild(screenContents ?? "0");
 
 buttons.forEach((button) => {
     button.addEventListener('mousedown', () => {
-        button.classList.add('button-clicked');
+        button.classList.add(`button-clicked-${modes[activeMode]}`);
     });
 
     button.addEventListener('mouseup', () => {
-        button.classList.remove('button-clicked');
+        button.classList.remove(`button-clicked-${modes[activeMode]}`);
     });
 
     button.addEventListener('click', () => {
@@ -35,13 +73,22 @@ buttons.forEach((button) => {
                 Evaluate();
                 screenContents.textContent = GetDisplayText();
                 return;
-            case "<-":
+            case "C":
                 Undo();
                 screenContents.textContent = GetDisplayText();
                 return;
         }
 
+        if (/\./.test(button.textContent)){
+            if (dotClicked || history.length === 0 || operands.test(history[history.length-1]))
+                return;
+
+            dotClicked = true;
+        }
+
         if (operands.test(button.textContent)){
+            dotClicked = false;
+
             if (history.length == 0){
                 return;
             }
@@ -103,6 +150,9 @@ function Modulo(num1, num2){
 function Reset(){
     initial = true;
     history = [];
+    processingFP = false;
+    dotClicked = false;
+    decimal = "";
 }
 
 function Undo(){
@@ -128,7 +178,20 @@ function Evaluate() {
             return;
         }
 
+        if (/\./.test(item)){
+            processingFP = true;
+            prevItem = item;
+            return;
+        }
+
         if (numbers.test(item)){
+            if (processingFP){
+                console.log("Appending to decimal side", decimal);
+                decimal += item;
+                prevItem = item;
+                return;
+            }
+
             if (operand == null){
                 num1 += item;
                 prevItem = item;
@@ -149,6 +212,21 @@ function Evaluate() {
 
         if (operands.test(item)){
 
+            if(processingFP){
+                console.log(`${num1}.${decimal}`);
+                
+                if (operand == null){
+                    num1 = +`${num1}.${decimal}`;
+                    decimal = "";
+                }
+                else {
+                    num2 = +`${num2}.${decimal}`;
+                    decimal = "";
+                }
+
+                processingFP = false;
+            }
+
             if (num1 != null && operand != null && num2!= null){
                 num1 = Operate(+num1, operand, +num2);
                 operand = null;
@@ -161,6 +239,12 @@ function Evaluate() {
         }
     });
 
+    if (processingFP){
+        num2 = +`${num2}.${decimal}`;
+        decimal = "";
+        processingFP = false;
+    }
+
     history = [Operate(+num1, operand, +num2)];
     num1 = null;
     operand = null;
@@ -168,5 +252,5 @@ function Evaluate() {
 }
 
 function GetDisplayText(){  
-    return history.join(' ');
+    return history.join('');
 }
